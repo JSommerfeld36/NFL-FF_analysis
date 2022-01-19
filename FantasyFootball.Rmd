@@ -1,0 +1,585 @@
+---
+author: "Joel Sommerfeld"
+date: "9/30/2021"
+output: pdf_document
+---
+```{r Sort the title out, message=FALSE, warning=FALSE, include=FALSE}
+library(rvest)
+
+t = read_html("https://www.nfl.com/schedules/2021/REG13/")
+this = t %>% html_nodes("title") %>% html_text()
+new_title = strsplit(this, "S")[[1]][1]
+doc_name = paste0(new_title, "- Fantasy Football Overview")
+```
+---
+title: `r doc_name`
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+```
+
+This document attempts to rank each player in their respective positions throughout the 2021 NFL season. The hope is that these rankings will be able to guide the selection of key fantasy football components by providing a variety of information related to both offense and defense. Some game and season outcome predictions may also be included for fun. Graphs and tables will be broken into two sections: Positional and Team. All totals in these graphs are cumulative over the season unless otherwise stated.
+
+## Future Work
+
+-   Correlation between my QB rank and fantasy points rank
+
+-   Add graph to track ranking over time
+
+-   Maybe some more simulations on things like playoff chances
+
+-   Add in each QBs/team's play type tendencies (passing or rushing)
+
+-   Rank WR by catch percentage with attempts and completions in the bar chart
+
+```{r PackageLoad, message=FALSE, warning=FALSE}
+setwd("/Users/joelsommerfeld/Desktop/General Stuff")
+library(rvest)
+library(data.table)
+library(ggplot2)
+library(knitr)
+
+# For simulations
+library(progressr)
+library(nflseedR)
+library(dplyr, warn.conflicts = FALSE)
+```
+
+```{r WinPredictions, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+
+options(digits = 3)
+
+# Activate progress updates
+#progressr::handlers(global = TRUE)
+
+# Parallel processing can be activated via the following line
+future::plan("multisession")
+tictoc::tic()
+# Simulate the season 4 times in 2 rounds
+#set.seed(234567)
+sims <- simulate_nfl(
+  nfl_season = 2021,
+  fresh_season = FALSE,
+  simulations = 10000
+)
+
+wins = sims$games %>% dplyr::filter(week == "10" & home_team =="NE") %>% data.frame()
+
+median(wins$result)
+mean(wins$result)
+tictoc::toc()
+Sys.time()
+```
+
+# Positional Stats
+
+These graphs are the end product of a 2:1 ratio of frustration and number crunching. It shows the average rank of each position across a variety of measures which can be found here: <https://www.pro-football-reference.com/years/2021/passing.htm>
+
+## Quarterback
+
+```{r QB_Stats, echo=FALSE, warning=FALSE, paged.print=FALSE}
+qb = read_html("https://www.pro-football-reference.com/years/2021/passing.htm")
+QB_dat = html_table(qb)
+QB_dat = QB_dat[[1]]
+QB_dat = subset(QB_dat, QB_dat$Pos == "qb" & G >= 5)
+
+# Rank order for all columns and record the position of each player 
+names = data.table(QB_dat$Player)
+col_name = colnames(QB_dat)
+#player_id = as.data.table(QB[,1])
+names = names[order(V1)]
+
+col2invert = c(15,16,25,29)
+QB_stat_ranks = NULL 
+for (i in 9:31) {
+  stat_col = data.table(QB_dat$Player, QB_dat[[i]])
+  colnames(stat_col) = c("player_id", col_name[i])
+  
+  if (i%in%col2invert) {
+    stat_col = stat_col[order(stat_col[,2])]
+    #stat_col = data.table(stat_col, seq(nrow(stat_col), 1, -1))
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print("correct one")
+  } else {
+    stat_col = stat_col[order(-stat_col[,2])]
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print('not correct one')
+  }
+  colnames(stat_col)[3] = c(paste0(colnames(stat_col)[2],"_rank"))
+  
+  stat_col[,2] = NULL
+  stat_col = stat_col[order(stat_col[,1])]
+  stat_col[,1] = NULL
+  
+  QB_stat_ranks[[i]] = data.table(stat_col)
+}
+
+rankings = Reduce(cbind, QB_stat_ranks)
+rank_avg = rowMeans(rankings[,1:23])
+rank_avg = data.table(names, rank_avg)
+colnames(rank_avg)[1] = "player_name"
+rank_avg = rank_avg[order(rank_avg)]
+
+QBplot = ggplot(data = rank_avg, aes(x = reorder(player_name, rank_avg), y = rank_avg))+
+  geom_bar(stat = 'identity', fill = '#bd2b2b') + labs(title = "2021 Season QB Rankings", caption = "Data Source: https://www.pro-football-reference.com/years/2021/passing.htm") +
+  ylab("Avg Rank") + theme(axis.title.x = element_blank(), 
+                           axis.text.x = element_text(angle = 60, vjust = 1, hjust=1))
+QBplot
+```
+
+```{r QB_week_rank, echo=FALSE, warning=FALSE, paged.print=FALSE}
+# Write out a file with the names and a rank to track over time
+# Order alphabetically so the ranks get assigned to the same person each week
+QB_week_rank = data.table(rank_avg, 1:nrow(rank_avg))
+QB_week_rank = QB_week_rank[order(player_name)]
+
+# For week 4 I need to add in a line to read in the file and then write out the ranks.
+
+# Need to change this slightly so that the list is created based off the rank of each player, rather than their name alphabetically. 
+QB_rank_prev = fread("QB_week_rankings.csv")
+QB_week_rank = data.table(QB_rank_prev, QB_week_rank[,3])
+
+weeks = NULL
+for (w in 3:ncol(QB_week_rank)) {
+  weeks[w] = paste0("week_",w + 2)
+}
+weeks = weeks[3:length(weeks)]
+colnames(QB_week_rank) = c("player_name", "rank_avg", weeks)
+fwrite(QB_week_rank, "QB_week_rankings.csv")
+```
+
+```{r}
+QB_week = QB_week_rank[order(rev(QB_week_rank))]
+QB_week = QB_week[,last(QB_week)]
+ranks = data.table(head(rank_avg, 15), head(QB_week, 15))
+kable(ranks, col.names = c("Player Name", "Average Cumulative Rank", "Weekly Ranking"), caption = "Top 15 QBs and their average cumulative rank calculated from 22 different statistics taken from graph above.")
+```
+## Wide Reciever
+
+```{r WR_Stats, echo=FALSE, paged.print=FALSE}
+wr = read_html("https://www.pro-football-reference.com/years/2021/receiving.htm")
+wr = html_table(wr)
+WR_rec_dat = wr[[1]]
+WR_rec_dat = subset(WR_rec_dat, WR_rec_dat$Pos == "wr" & G >= 5)
+
+names = data.table(WR_rec_dat$Player)
+col_name = colnames(WR_rec_dat)
+#player_id = as.data.table(QB[,1])
+names = names[order(V1)]
+
+col2invert = c(19)
+WR_stat_ranks = NULL 
+
+for (i in 8:19) {
+  stat_col = data.table(WR_rec_dat$Player, WR_rec_dat[[i]])
+  colnames(stat_col) = c("player_id", col_name[i])
+  
+  if (i%in%col2invert) {
+    stat_col = stat_col[order(stat_col[,2])]
+    #stat_col = data.table(stat_col, seq(nrow(stat_col), 1, -1))
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print("Inverted order")
+  } else {
+    stat_col = stat_col[order(-stat_col[,2])]
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print('Regular order')
+  }
+  colnames(stat_col)[3] = c(paste0(colnames(stat_col)[2],"_rank"))
+  
+  stat_col[,2] = NULL
+  stat_col = stat_col[order(stat_col[,1])]
+  stat_col[,1] = NULL
+  
+  WR_stat_ranks[[i]] = data.table(stat_col)
+}
+
+rankings = Reduce(cbind, WR_stat_ranks)
+WR_rec_rank_avg = rowMeans(rankings[,1:12])
+WR_rec_rank_avg = data.table(names, WR_rec_rank_avg)
+colnames(WR_rec_rank_avg)[1] = "player_name"
+WR_rec_rank_avg = WR_rec_rank_avg[order(WR_rec_rank_avg)]
+
+WRplot = ggplot(data = WR_rec_rank_avg[1:50,], aes(x = reorder(player_name, WR_rec_rank_avg), y = WR_rec_rank_avg))+
+  geom_bar(stat = 'identity', fill = '#006aff') + labs(title = "2021 Season WR Rankings: Top 50 Recievers through week 3", caption = "https://www.pro-football-reference.com/years/2021/receiving.htm") +
+  ylab("Avg Rank") + theme(axis.title.x = element_blank(), 
+                           axis.text.x = element_text(angle = 60, vjust = 1, hjust=1))
+
+  WRplot
+```
+
+
+```{r WR_week_rank, echo=FALSE, message=FALSE, warning=FALSE}
+# Write out a file with the names and a rank to track over time
+# Order alphabetically so the ranks get assigned to the same person each week
+WR_week_rank = data.table(WR_rec_rank_avg, 1:nrow(WR_rec_rank_avg))
+WR_week_rank = WR_week_rank[order(player_name)]
+# For week 4 I need to add in a line to read in the file and then write out the ranks.
+
+WR_rank_prev = fread("WR_week_rankings.csv")
+WR_week_rank = data.table(WR_rank_prev, WR_week_rank[,3])
+
+weeks = NULL
+for (w in 3:ncol(WR_week_rank)) {
+  weeks[w] = paste0("week_",w + 2)
+}
+weeks = weeks[3:length(weeks)]
+colnames(WR_week_rank) = c("player_name", "rank_avg", weeks)
+fwrite(WR_week_rank, "WR_week_rankings.csv")
+```
+
+
+```{r WRtable, echo=FALSE, message=FALSE, warning=FALSE}
+d1 = head(WR_rec_rank_avg, 15)
+d2 = WR_rec_rank_avg[16:30,]
+d3 = WR_week_rank[order(rev(WR_week_rank))]
+d3 = d3[,last(d3)]
+d = data.table(d1,d3[1:15])
+e = data.table(d2, d3[16:30])
+
+kable(
+  list(d, e),
+  caption = 'Top 30 WRs and their average rank calculated across 11 different metrics.',
+  booktabs = TRUE, valign = 't', col.names = c("Player Name", "Average Cumulative Rank", "Weekly Ranking")
+)
+
+# Not sure how I feel about this part
+# d3 = WR_week_rank[order(last(WR_week_rank))]
+# d4 = d3[1:30,]
+# kable(
+#   list(d4),
+#   caption = 'Top 30 WRs for the week based on their updated average ranks.',
+#   booktabs = TRUE, valign = 't', col.names = c("Player Name", "Average Rank", "Week Rank")
+# )
+```
+
+```{r WR_Catching, echo=FALSE, message=FALSE, warning=FALSE}
+# Need to create a data table that has attempts and completions in with the corresponding catch percentage. 
+
+# targets = data.table(WR_rec_dat[,c(2,8)])
+# test = melt(targets)
+# receptions = WR_rec_dat[,c(2,9)]
+# catching = data.table(targets, receptions)
+# 
+# DF1 = data.table(DF1, avg)
+# DF1 = DF1[order(avg)]
+```
+
+
+## Running Back
+
+```{r RB_stats, echo=FALSE, paged.print=FALSE}
+
+## Recieving
+wr = read_html("https://www.pro-football-reference.com/years/2021/receiving.htm")
+wr = html_table(wr)
+RB_rec_dat = wr[[1]]
+RB_rec_dat = subset(RB_rec_dat, RB_rec_dat$Pos == "rb" & G >= 5)
+
+
+# Rank order for all columns and record the position of each player 
+names = data.table(RB_rec_dat[,2])
+col_name = colnames(RB_rec_dat)
+#player_id = as.data.table(QB[,1])
+names = names[order(Player)]
+
+col2invert = c(19)
+RB_stat_ranks = NULL 
+for (i in 8:19) {
+  stat_col = data.table(RB_rec_dat$Player, RB_rec_dat[[i]])
+  colnames(stat_col) = c("player_id", col_name[i])
+  
+  if (i%in%col2invert) {
+    stat_col = stat_col[order(stat_col[,2])]
+    #stat_col = data.table(stat_col, seq(nrow(stat_col), 1, -1))
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print("Inverted order")
+  } else {
+    stat_col = stat_col[order(-stat_col[,2])]
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print('Regular order')
+  }
+  colnames(stat_col)[3] = c(paste0(colnames(stat_col)[2],"_rank"))
+  
+  stat_col[,2] = NULL
+  stat_col = stat_col[order(stat_col[,1])]
+  stat_col[,1] = NULL
+  
+  RB_stat_ranks[[i]] = data.table(stat_col)
+}
+
+rankings = Reduce(cbind, RB_stat_ranks)
+rec_rank_avg = rowMeans(rankings[,1:12])
+rec_rank_avg = data.table(names, rec_rank_avg)
+colnames(rec_rank_avg)[1] = "player_name"
+#rank_avg = merge(start, rank_avg)
+rec_rank_avg = rec_rank_avg[order(rec_rank_avg)]
+
+
+
+## RUSHING
+rush = read_html("https://www.pro-football-reference.com/years/2021/rushing.htm")
+rushing = html_table(rush)
+rushing = rushing[[1]]
+colnames(rushing) = rushing[1,]
+rushing = rushing[2:nrow(rushing),]
+RB_rush_dat = subset(rushing, rushing$Pos == "rb")
+
+# Rank order for all columns and record the position of each player 
+names = data.table(RB_rush_dat[,2])
+col_name = colnames(RB_rush_dat)
+#player_id = as.data.table(QB[,1])
+names = names[order(Player)]
+
+col2invert = c(15)
+RB_stat_ranks = NULL 
+for (i in 8:15) {
+  stat_col = data.table(RB_rush_dat$Player, RB_rush_dat[[i]])
+  colnames(stat_col) = c("player_id", col_name[i])
+  
+  if (i%in%col2invert) {
+    stat_col = stat_col[order(stat_col[,2])]
+    #stat_col = data.table(stat_col, seq(nrow(stat_col), 1, -1))
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print("Inverted order")
+  } else {
+    stat_col = stat_col[order(-stat_col[,2])]
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print('Regular order')
+  }
+  colnames(stat_col)[3] = c(paste0(colnames(stat_col)[2],"_rank"))
+  
+  stat_col[,2] = NULL
+  stat_col = stat_col[order(stat_col[,1])]
+  stat_col[,1] = NULL
+  
+  RB_stat_ranks[[i]] = data.table(stat_col)
+}
+
+rankings = Reduce(cbind, RB_stat_ranks)
+rush_rank_avg = rowMeans(rankings[,1:8])
+rush_rank_avg = data.table(names, rush_rank_avg)
+colnames(rush_rank_avg)[1] = "player_name"
+#rank_avg = merge(start, rank_avg)
+rush_rank_avg = rush_rank_avg[order(rush_rank_avg)]
+rb_rank = merge(rec_rank_avg, rush_rank_avg)
+rb_avg = rowMeans(rb_rank[,2:3])
+rb_rank = data.table(rb_rank, rb_avg)
+rb_rank = rb_rank[order(rb_avg)]
+
+df = rb_rank[,1:3]
+DF1 = melt(df)
+avg = rb_rank$rb_avg
+avg = rep(avg, 2)
+DF1 = data.table(DF1, avg)
+DF1 = DF1[order(avg)]
+RB_rank_avg = DF1
+
+RBplot = ggplot(data = RB_rank_avg, aes(fill = variable, x = reorder(player_name, avg),
+                                y = value)) +
+  geom_bar(stat = 'identity') + 
+  scale_fill_manual(name = "Play Type",labels=c("Receiving","Rushing"), 
+                    values = c("#006aff", "#4fb350")) +
+  labs(title = '2021 Season RB Rankings', 
+       caption = "Data Source: https://www.pro-football-reference.com/years/2021/rushing.htm \n 
+       https://www.pro-football-reference.com/years/2021/receiving.htm") +
+ ylab("Avg Rank") + 
+  theme(axis.title.x = element_blank(), 
+        axis.text.x = element_text(angle = 60, vjust = 1, hjust=1))
+RBplot
+```
+
+```{r RB_week_rank, echo=FALSE, message=FALSE, warning=FALSE}
+# Write out a file with the names and a rank to track over time
+# Order alphabetically so the ranks get assigned to the same person each week
+
+RB_week_rank = subset(RB_rank_avg, variable == "rec_rank_avg")
+RB_week_rank = data.table(RB_week_rank[,c(1,3)], 1:nrow(RB_week_rank))
+RB_week_rank = RB_week_rank[order(player_name)]
+# For week 4 I need to add in a line to read in the file and then write out the ranks.
+RB_rank_prev = fread("RB_week_rankings.csv")
+RB_week_rank = data.table(RB_rank_prev, RB_week_rank[,3])
+
+weeks = NULL
+for (w in 3:ncol(RB_week_rank)) {
+  weeks[w] = paste0("week_",w + 2)
+}
+weeks = weeks[3:length(weeks)]
+colnames(RB_week_rank) = c("player_name", "rank_avg", weeks)
+fwrite(RB_week_rank, "RB_week_rankings.csv")
+```
+
+```{r RBtable, echo=FALSE, message=FALSE, warning=FALSE}
+RB_week = RB_week_rank[order(rev(RB_week_rank))]
+RB_week = RB_week[,last(RB_week)]
+
+RBranks = RB_rank_avg[seq(1, nrow(RB_rank_avg), 2), c(1,4)]
+
+RB_rank = data.table(RBranks[1:15], RB_week[1:15])
+kable(RB_rank, col.names = c("Player Name", "Average Cumulative Rank", "Weekly Ranking"), caption = "Top 15 RBs and their average rank calculated from 8 different statistics taken from graph above." )
+
+```
+## Tight End
+
+```{r TE_stats, echo=FALSE, paged.print=FALSE}
+wr = read_html("https://www.pro-football-reference.com/years/2021/receiving.htm")
+wr = html_table(wr)
+TE_rec_dat = wr[[1]]
+TE_rec_dat = subset(TE_rec_dat, TE_rec_dat$Pos == "te" & G >= 5)
+
+# Rank order for all columns and record the position of each player 
+names = data.table(TE_rec_dat[,2])
+col_name = colnames(TE_rec_dat)
+names = names[order(Player)]
+
+col2invert = c(19)
+TE_stat_ranks = NULL 
+for (i in 8:19) {
+  stat_col = data.table(TE_rec_dat$Player, TE_rec_dat[[i]])
+  colnames(stat_col) = c("player_id", col_name[i])
+  
+  if (i%in%col2invert) {
+    stat_col = stat_col[order(stat_col[,2])]
+    #stat_col = data.table(stat_col, seq(nrow(stat_col), 1, -1))
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print("Inverted order")
+  } else {
+    stat_col = stat_col[order(-stat_col[,2])]
+    stat_col = data.table(stat_col, seq(1:nrow(stat_col)))
+    #print('Regular order')
+  }
+  colnames(stat_col)[3] = c(paste0(colnames(stat_col)[2],"_rank"))
+  
+  stat_col[,2] = NULL
+  stat_col = stat_col[order(stat_col[,1])]
+  stat_col[,1] = NULL
+  
+  TE_stat_ranks[[i]] = data.table(stat_col)
+}
+
+rankings = Reduce(cbind, TE_stat_ranks)
+TE_rank_avg = rowMeans(rankings[,1:12])
+TE_rank_avg = data.table(names, TE_rank_avg)
+colnames(TE_rank_avg)[1] = "player_name"
+TE_rank_avg = TE_rank_avg[order(TE_rank_avg)]
+
+TEplot = ggplot(data = TE_rank_avg[1:50,], aes(x = reorder(player_name, TE_rank_avg), 
+                                        y = TE_rank_avg))+
+  geom_bar(stat = 'identity', fill = '#FF9033') + labs(title = '2021 Season TE Rankings: Top 50 through week 3', caption = "Data Source: https://www.pro-football-reference.com/years/2021/receiving.htm") +
+  ylab("Avg Rank") + theme(axis.title.x = element_blank(), 
+                           axis.text.x = element_text(angle = 60, vjust = 1, hjust=1))
+TEplot
+```
+
+
+```{r TE_week_rank, echo=FALSE, message=FALSE, warning=FALSE}
+# Write out a file with the names and a rank to track over time
+# Order alphabetically so the ranks get assigned to the same person each week
+
+TE_week_rank = data.table(TE_rank_avg, 1:nrow(TE_rank_avg))
+TE_week_rank = TE_week_rank[order(player_name)]
+# For week 4 I need to add in a line to read in the file and then write out the ranks.
+
+TE_rank_prev = fread("TE_week_rankings.csv")
+TE_week_rank = data.table(TE_rank_prev, TE_week_rank[,3])
+
+weeks = NULL
+for (w in 3:ncol(TE_week_rank)) {
+  weeks[w] = paste0("week_",w + 2)
+}
+weeks = weeks[3:length(weeks)]
+colnames(TE_week_rank) = c("player_name", "rank_avg", weeks)
+fwrite(TE_week_rank, "TE_week_rankings.csv")
+```
+
+```{r TEtable, echo=FALSE, message=FALSE, warning=FALSE}
+TE_week = TE_week_rank[order(rev(TE_week_rank))]
+TE_week = TE_week[,last(TE_week)]
+TEranks = data.table(head(TE_rank_avg, 15), head(TE_week, 15))
+
+kable(TEranks, col.names = c("Player Name", "Average Cumulative Rank", "Weekly Ranking"), caption = "Top 15 TEs and their average rank calculated from 8 different statistics taken from graph above." )
+
+```
+# Team Stats
+
+## Offense
+
+```{r Off_stats, echo=FALSE, paged.print=FALSE}
+# All the regular stats like receptions and rushing yards
+off = read_html("https://www.espn.com/nfl/stats/team")
+offense = html_table(off)
+team_name_offense = offense[[1]]
+stats_offense = offense[[2]]
+team_offense = data.table(team_name_offense[2:33,], stats_offense[2:33,])
+off_names = c("team", "games_played", "total_yards", "yards_per_game", "total_pass_yards",
+              "pass_yards_per_game", "total_rush_yards", "rush_yards_per_game", "total_points",
+              "points_per_game")
+colnames(team_offense) = off_names
+
+# Get passing and rushing totals
+passing_off = data.table(team_offense$team, team_offense$total_pass_yards, rep("pass", 32))
+passing_off$V2 <- as.numeric(gsub(",","",passing_off$V2))
+rushing_off = data.table(team_offense$team, team_offense$total_rush_yards,
+rep("rush", 32))
+rushing_off$V2 <- as.numeric(gsub(",","",rushing_off$V2))
+
+#sums = rep(rowSums(cbind(as.numeric(passing_off$V2), as.numeric(rushing_off$V2))),2)
+points = as.numeric(rep(team_offense$total_points, 2))
+
+# join them and add the total yards
+yds_gain = rbind(passing_off, rushing_off) 
+yds_gain = data.table(yds_gain, points)
+colnames(yds_gain) = c("team", "gained", "type", "points")
+yds_gain$gained = as.numeric(yds_gain$gained)
+
+# Create the plot so that the teams are sorted from left to right by total yards given up
+offplot = ggplot(data = yds_gain, aes(fill = type, x = reorder(team, points),
+                                      y = gained)) +
+  geom_bar(stat = 'identity') + 
+  scale_fill_manual(name = "Play Type",labels=c("Passing","Rushing"), 
+                    values = c("#006aff", "#4fb350")) + labs(title = "2021 Season Offense: Total Yards Gained per Play Type wrt Total Points Scored", caption = "https://www.espn.com/nfl/stats/team") + ylab("Yards Gained") + 
+  theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 60, vjust = 1, hjust=1))
+offplot
+```
+
+This graph shows a break down of how each team gains yardage in relation to the number of points they score. The farther to the right the team is on the plot, the more points they have scored.
+
+## Defense
+
+```{r def_stats, echo=FALSE, paged.print=FALSE}
+#Read and organise data
+def = read_html("https://www.pro-football-reference.com/years/2021/opp.htm")
+defense = html_table(def)
+defense = defense[[1]]
+colnames(defense) = defense[1,]
+defense = defense[c(-1,-34,-35,-36),]
+names = c("rank", "team", "games", "points_against", "yards_conceded", "off_plays_faced", 
+          "yards_per_off_play", "TO", "fumbles_recovered", "1stD_faced", "pass_cmp", 
+          "pass_att", "pass_yd_conceded", "pass_td_conceded", "int_recovered", 
+          "net_yd_pass_att", "pass_1stD_against", "rush_att", "rush_yards_conceded", 
+          "rush_td_conceded", "rush_yards_per_att", "rush_1stD_conceded", "pen_against", 
+          "pen_yards_conceded", "pen_1stD", "off_score_percent", "turnover_percent", 
+          "expected_points_conceded")
+colnames(defense) = names
+
+# Get passing and rushing totals
+passing_def = data.table(defense$team, defense$pass_yd_conceded, rep("pass", 32))
+rushing_def = data.table(defense$team, defense$rush_yards_conceded, rep("rush", 32))
+sums = rep(rowSums(cbind(as.numeric(passing_def$V2), as.numeric(rushing_def$V2))),2)
+
+# join them and add the total yards
+yds_conc = rbind(passing_def, rushing_def) 
+yds_conc = data.table(yds_conc, sums)
+colnames(yds_conc) = c("team", "conceded", "type", "sums")
+yds_conc$conceded=as.numeric(yds_conc$conceded)
+
+# Create the plot so that the teams are sorted from left to right by total yards given up
+defplot = ggplot(data = yds_conc, aes(fill = type, x = reorder(team, sums),
+                                      y = conceded)) +
+  geom_bar(stat = 'identity') + 
+  scale_fill_manual(name = "Play Type",labels=c("Passing","Rushing"), 
+                    values = c("#006aff", "#4fb350")) + labs(title = "2021 Season Defense: Total Yards Allowed per Play Type", caption = "https://www.pro-football-reference.com/years/2021/opp.htm") + ylab("Yards Allowed") + 
+  theme(axis.title.x = element_blank(), 
+        axis.text.x = element_text(angle = 60, vjust = 1, hjust=1))
+defplot
+```
