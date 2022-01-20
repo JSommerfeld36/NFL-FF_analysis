@@ -8,6 +8,7 @@ library(nflreadr)
 library(data.table)
 
 dat = data.table(load_player_stats()) # Load all the player stats for the season so far
+
 colnames(dat)[1] = "gsis_id" # change the name of the column to make merging later easy
 week = subset(dat, dat$week == 1) # Filter for current week
 week = week[-c(271), ] # Remove Henry Ruggs because ya know..... 
