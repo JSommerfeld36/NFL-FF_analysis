@@ -108,3 +108,27 @@ radarchart(qbs[,1:12],axistype = 1,
 legend(-1.5,1.2, legend=c(qb_names), seg.len=0.5, title="QB", pch=1, 
        bty="n" ,lwd=3, y.intersp=0.5, horiz=FALSE, col=colors, cex = 0.8)
 
+name = "T.Brady"
+week = 4
+
+plot_dat %>%
+  filter(plot_dat$player_name %in% name) %>%
+  ggplot(plot_dat, mapping = aes(week, completions)) + 
+  geom_line(aes(y = completions, color = "completions")) +       
+  geom_line(aes(y = attempts, color = "attempts")) + 
+  scale_color_manual("", breaks = c("completions","attempts"), 
+                  values = c("red", "blue")) +
+  labs(title = paste(name, "completions over the season")) + 
+  ylab("# Completions") + xlab('Game Week') + 
+  theme_bw() + 
+  theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+  
+
+
+league_max = data.frame(lapply(plot_dat[,7:48], max))
+league_min = data.frame(lapply(plot_dat[,7:48], min))
+
+
+
+plot_dat %>%
+  filter(plot_dat$player_name %in% name) 
