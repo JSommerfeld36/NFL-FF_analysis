@@ -12,28 +12,23 @@ library(shinythemes)
 # Filter players that only occur once
 # Add 3 inputs so I can compare between players and then rendering a graph will be a little more straight forward
 
-
 dat = data.table(load_player_stats()) # Load all the player stats for the season so far
-
 colnames(dat)[1] = "gsis_id" # change the name of the column to make merging later easy
-
 week = dat[player_name != "H.Ruggs"]
-
 weekly_players = unique(week$gsis_id) # Get the unique IDs of the players for the week
-
 names = data.table(load_rosters(2021)) # Load in the complete roster
 
 players = names[names$gsis_id %in% weekly_players, ] # Filter players so only the ones who played count
 all_dat = merge(week, players) # Merge player stats with roster data so we have player positions
 all_dat = all_dat[position %in% c("QB", "WR", "TE", "RB"),]
 
-table_dat = all_dat
+table_dat = all_dat # New vairable just for the table and plot to keep things more simple
 plot_dat = all_dat
 
 
 # Define UI 
 ui = fluidPage(theme = shinytheme("yeti"),
-               titlePanel("Fantasy Football Stuff"), 
+               titlePanel("Fantasy Football Stuff -- Version 1.01 (March 27, 2022)"), 
                sidebarLayout(
                  
                  sidebarPanel(
@@ -55,7 +50,6 @@ ui = fluidPage(theme = shinytheme("yeti"),
 )
 
 
-
 # Define server
 server <- function(input, output) {
   
@@ -71,22 +65,31 @@ server <- function(input, output) {
   
   # Data table that is below the graph. This is filtered based on the player and week inputs selected
   output$t1 <- renderTable({
+    
     if (input$group == "QB") {
+      
     table_dat %>%
       filter(table_dat$player_name %in% input$player & table_dat$week %in% input$gameWeek) %>%
       select(c(2,3,7:12))
+      
     } else if (input$group == "WR"){
+      
       table_dat %>%
         filter(table_dat$player_name %in% input$player & table_dat$week %in% input$gameWeek) %>%
         select(c(2,3,30:38))
+      
     } else if (input$group == "RB"){
+      
       table_dat %>%
         filter(table_dat$player_name %in% input$player & table_dat$week %in% input$gameWeek) %>%
         select(c(2,3,22:27))
+      
     } else if (input$group == "TE"){
+      
       table_dat %>%
         filter(table_dat$player_name %in% input$player & table_dat$week %in% input$gameWeek) %>%
         select(c(2,3,30:38))
+      
     } else {}
   })
   
@@ -94,37 +97,57 @@ server <- function(input, output) {
   # can be added to allow for the user to select what they want to look at
   output$plot1 <- renderPlot({
     if (input$group == "QB") {
+      
     plot_dat %>%
       filter(plot_dat$player_name %in% input$player) %>%
-      ggplot(plot_dat, mapping = aes(week, completions)) + 
-      geom_line() + 
-      labs(title = paste(input$player, "completions over the season")) + 
-      ylab("# Completions") + xlab('Game Week') + 
+      ggplot(plot_dat, mapping = aes(week)) +
+        geom_line(aes(y = completions, color = "completions")) +       
+        geom_line(aes(y = attempts, color = "attempts")) + 
+        scale_color_manual("", breaks = c("completions","attempts"), 
+                           values = c("red", "blue")) +
+      labs(title = paste(input$player, "completions/attempts over the season")) + 
+      ylab("Count") + xlab('Game Week') + 
       theme_bw() + theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+      
     } else if (input$group == "WR"){
+      
       plot_dat %>%
         filter(plot_dat$player_name %in% input$player) %>%
-        ggplot(plot_dat, mapping = aes(week, receptions)) + 
-        geom_line() + 
-        labs(title = paste(input$player, "receptions over the season")) + 
-        ylab("# Receptions") + xlab('Game Week') + 
+        ggplot(plot_dat, mapping = aes(week)) + 
+        geom_line(aes(y = receptions, color = "receptions")) +       
+        geom_line(aes(y = targets, color = "targets")) + 
+        scale_color_manual("", breaks = c("receptions","targets"), 
+                           values = c("red", "blue")) +
+        labs(title = paste(input$player, "receptions/targets over the season")) + 
+        ylab("Count") + xlab('Game Week') + 
         theme_bw() + theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+      
     } else if (input$group == "RB"){
+      
       plot_dat %>%
         filter(plot_dat$player_name %in% input$player) %>%
         ggplot(plot_dat, mapping = aes(week, rushing_yards)) + 
-        geom_line() + 
-        labs(title = paste(input$player, "Rushing yards over the season")) + 
-        ylab("# Rushing Yards") + xlab('Game Week') + 
+        geom_line(aes(y = rushing_yards, color = "rushing_yards")) +       
+        geom_line(aes(y = carries, color = "carries")) + 
+        scale_color_manual("", breaks = c("rushing_yards","carries"), 
+                           values = c("red", "blue")) +
+        labs(title = paste(input$player, "Rushing yards/carries over the season")) + 
+        ylab("Count") + xlab('Game Week') + 
         theme_bw() + theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+      
     } else if (input$group == "TE"){
+      
       plot_dat %>%
         filter(plot_dat$player_name %in% input$player) %>%
-        ggplot(plot_dat, mapping = aes(week, receptions)) + 
-        geom_line() + 
-        labs(title = paste(input$player, "receptions over the season")) + 
-        ylab("# Receptions") + xlab('Game Week') + 
+        ggplot(plot_dat, mapping = aes(week)) + 
+        geom_line(aes(y = receptions, color = "receptions")) +       
+        geom_line(aes(y = targets, color = "targets")) + 
+        scale_color_manual("", breaks = c("receptions","targets"), 
+                           values = c("red", "blue")) +
+        labs(title = paste(input$player, "receptions/targets over the season")) + 
+        ylab("Count") + xlab('Game Week') + 
         theme_bw() + theme(panel.grid.minor = element_blank(), panel.grid.major.x = element_blank())
+      
     } else {}
   })
 }
