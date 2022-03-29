@@ -113,8 +113,9 @@ week = 4
 
 plot_dat %>%
   filter(plot_dat$player_name %in% name) %>%
-  ggplot(plot_dat, mapping = aes(week, completions)) + 
-  geom_line(aes(y = completions, color = "completions")) +       
+  ggplot(plot_dat, mapping = aes(week)) + 
+  geom_point(aes(y = completions, color = "completions")) + 
+  geom_line(aes(y = completions, color = "completions")) +
   geom_line(aes(y = attempts, color = "attempts")) + 
   scale_color_manual("", breaks = c("completions","attempts"), 
                   values = c("red", "blue")) +
@@ -129,6 +130,15 @@ league_max = data.frame(lapply(plot_dat[,7:48], max))
 league_min = data.frame(lapply(plot_dat[,7:48], min))
 
 
+# Work out how to summarise the results for the whole season. 
+  # Currently it sums the players totals which make them so much greater than the league
+  # I need to sum all the totals for all the players and then bind the selected player with those
 
-plot_dat %>%
-  filter(plot_dat$player_name %in% name) 
+# I think that doing the radar chart week to week in the app makes the most sense and it is way easier to do
+# Just need to work out how to create variables in the server and bind them with the actual data and resort the rows 
+table_dat %>%
+  filter(plot_dat$player_name %in% name) %>%
+  select(c(7:48)) %>%
+  colSums() %>%
+  bind_rows(league_max, league_min)
+
