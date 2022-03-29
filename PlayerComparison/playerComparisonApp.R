@@ -22,13 +22,20 @@ players = names[names$gsis_id %in% weekly_players, ] # Filter players so only th
 all_dat = merge(week, players) # Merge player stats with roster data so we have player positions
 all_dat = all_dat[position %in% c("QB", "WR", "TE", "RB"),]
 
-table_dat = all_dat # New vairable just for the table and plot to keep things more simple
+# Make A.Rodgers the Aa.Rodgers
+all_dat$player_name = gsub("A.Rodgers", "Aa.Rodgers", all_dat$player_name)
+# Remove anyone who has played less than 5 games
+t = data.frame(table(all_dat$gsis_id)) 
+t = t[t$Freq >=5,]
+all_dat = all_dat[gsis_id %in% t$Var1,]
+
+table_dat = all_dat # New variable just for the table and plot to keep things more simple
 plot_dat = all_dat
 
 
 # Define UI 
 ui = fluidPage(theme = shinytheme("yeti"),
-               titlePanel("Fantasy Football Stuff -- Version 1.01 (March 27, 2022)"), 
+               titlePanel(paste0("Fantasy Football Stuff -- Version 1.02: ", Sys.Date())), 
                sidebarLayout(
                  
                  sidebarPanel(
@@ -102,7 +109,9 @@ server <- function(input, output) {
       filter(plot_dat$player_name %in% input$player) %>%
       ggplot(plot_dat, mapping = aes(week)) +
         geom_line(aes(y = completions, color = "completions")) +       
+        geom_point(aes(y = completions, color = "completions")) +       
         geom_line(aes(y = attempts, color = "attempts")) + 
+        geom_point(aes(y = attempts, color = "attempts")) + 
         scale_color_manual("", breaks = c("completions","attempts"), 
                            values = c("red", "blue")) +
       labs(title = paste(input$player, "completions/attempts over the season")) + 
@@ -115,7 +124,9 @@ server <- function(input, output) {
         filter(plot_dat$player_name %in% input$player) %>%
         ggplot(plot_dat, mapping = aes(week)) + 
         geom_line(aes(y = receptions, color = "receptions")) +       
+        geom_point(aes(y = receptions, color = "receptions")) +       
         geom_line(aes(y = targets, color = "targets")) + 
+        geom_point(aes(y = targets, color = "targets")) + 
         scale_color_manual("", breaks = c("receptions","targets"), 
                            values = c("red", "blue")) +
         labs(title = paste(input$player, "receptions/targets over the season")) + 
@@ -127,8 +138,10 @@ server <- function(input, output) {
       plot_dat %>%
         filter(plot_dat$player_name %in% input$player) %>%
         ggplot(plot_dat, mapping = aes(week, rushing_yards)) + 
-        geom_line(aes(y = rushing_yards, color = "rushing_yards")) +       
+        geom_line(aes(y = rushing_yards, color = "rushing_yards")) +
+        geom_point(aes(y = rushing_yards, color = "rushing_yards")) +
         geom_line(aes(y = carries, color = "carries")) + 
+        geom_point(aes(y = carries, color = "carries")) + 
         scale_color_manual("", breaks = c("rushing_yards","carries"), 
                            values = c("red", "blue")) +
         labs(title = paste(input$player, "Rushing yards/carries over the season")) + 
@@ -141,7 +154,9 @@ server <- function(input, output) {
         filter(plot_dat$player_name %in% input$player) %>%
         ggplot(plot_dat, mapping = aes(week)) + 
         geom_line(aes(y = receptions, color = "receptions")) +       
+        geom_point(aes(y = receptions, color = "receptions")) +       
         geom_line(aes(y = targets, color = "targets")) + 
+        geom_point(aes(y = targets, color = "targets")) + 
         scale_color_manual("", breaks = c("receptions","targets"), 
                            values = c("red", "blue")) +
         labs(title = paste(input$player, "receptions/targets over the season")) + 
