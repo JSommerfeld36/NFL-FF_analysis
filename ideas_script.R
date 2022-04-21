@@ -1,24 +1,4 @@
 
-# library(data.table)
-# library(tictoc)
-# 
-# tic()
-# for (i in 1:1000) {
-#   
-#   if (i == 1) {
-#     #y = data.table(rnorm(1000))
-#     y = data.table(matrix(data = rexp(200, rate = 10), nrow = 1000, ncol = 1000))    
-#     fwrite(y, "test.csv")
-#   }else {
-#     fread("test.csv")
-#     #y = data.table(rnorm(1000))
-#     y = data.table(matrix(data = rexp(200, rate = 10), nrow = 1000, ncol = 1000))    
-#     fwrite(y, "test.csv")
-#   }
-# }
-# 
-# file.remove("test.csv")
-# toc()
 
 
 player_name = c("Aaron Rodgers", "Justin Herbert", "Stefon Diggs", "Cooper Kupp", "Alvin Kamara", "Nick Chubb")
@@ -126,19 +106,41 @@ plot_dat %>%
   
 
 
-league_max = data.frame(lapply(plot_dat[,7:48], max))
-league_min = data.frame(lapply(plot_dat[,7:48], min))
+#Team level stats - Pie chart for target share
+library(scales)
+library(ggrepel)
+library(ggplot2)
 
 
-# Work out how to summarise the results for the whole season. 
-  # Currently it sums the players totals which make them so much greater than the league
-  # I need to sum all the totals for all the players and then bind the selected player with those
+# make pie chart for visualising target share
+team = plot_dat[recent_team == "KC" & week == "5" & position != "QB",]
+team = drop_na(team,target_share)
 
-# I think that doing the radar chart week to week in the app makes the most sense and it is way easier to do
-# Just need to work out how to create variables in the server and bind them with the actual data and resort the rows 
-table_dat %>%
-  filter(plot_dat$player_name %in% name) %>%
-  select(c(7:48)) %>%
-  colSums() %>%
-  bind_rows(league_max, league_min)
+team$concat = paste0(team$player_name, " - ", team$position)
+n = nrow(team)
 
+# Basic piechart
+ggplot(team, aes(x = "", y = target_share, fill = player_name)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar("y", start = 0) +
+  scale_fill_manual(hcl.colors(n, palette = "viridis")) +
+  theme_void() + 
+  geom_text(aes(x = 1.3, label = percent(target_share)), position = position_stack(vjust = 0.5), size = 4) +
+  scale_fill_discrete(name = "Player Name", labels = team$concat) +
+  labs(title = "Target Share for Kansas City Chiefs, Week 4")
+
+# pie chart of the play type tendencies
+x = load_pbp()
+dat = x[x$posteam == "CLE",]
+#colnames(dat)
+t = data.frame(table(dat$play_type)) 
+t$pcent = t$Freq/sum(t$Freq)*100
+
+
+ggplot(t, aes(x = "", y = reorder(Freq, pcent), fill = Var1)) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+  coord_polar("y", start = 0) +
+  theme_void() + 
+  geom_text(aes(x = 1.3, label = percent(pcent/100)), position = position_stack(vjust = 0.5), size = 4) +
+  scale_fill_discrete(name = "Play Type", labels = t$Var1) +
+  labs(title = paste0("Play Type Percentages for ", na.omit(unique(dat$posteam))))
