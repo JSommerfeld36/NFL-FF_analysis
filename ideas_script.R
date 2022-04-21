@@ -131,29 +131,33 @@ team = all_dat[recent_team == "KC" & week == "5" & position != "QB",]
 team = drop_na(team,target_share)
 
 team$concat = paste0(team$player_name, " - ", team$position)
-n = nrow(team)
+
+# A nice color palette
+nice = colorspace::diverge_hcl(n = nrow(team))
 
 # Basic piechart
 ggplot(team, aes(x = "", y = target_share, fill = player_name)) +
   geom_bar(stat = "identity", width = 1, color = "white") +
   coord_polar("y", start = 0) +
   theme_void() + 
+  scale_fill_manual(values = nice, name = "Player Name", guide = guide_legend(reverse = TRUE)) +
   geom_text(aes(x = 1.3, label = percent(target_share)), position = position_stack(vjust = 0.5), size = 4) +
-  scale_fill_discrete(name = "Player Name", labels = team$concat) +
+  #scale_fill_discrete(name = "Player Name", labels = team$concat) +
   labs(title = "Target Share for Kansas City Chiefs, Week 4")
 
 # pie chart of the play type tendencies
 x = load_pbp()
-dat = x[x$posteam == "KC",]
+dat = x[x$posteam == "CLE",]
 #colnames(dat)
 t = data.frame(table(dat$play_type)) 
 t$pcent = t$Freq/sum(t$Freq)*100
 
 # Why is it not scaling the slices according to the values??
-ggplot(t, aes(x = "", y = reorder(Freq, pcent), fill = Var1)) +
+ggplot(t, aes(x = "", y = pcent, fill = Var1)) +
   geom_bar(stat = "identity", width = 1, color = "white") +
   coord_polar("y", start = 0) +
   theme_void() + 
+  scale_fill_manual(values = nice, name = "Player Name", guide = guide_legend(reverse = TRUE)) +
   geom_text(aes(x = 1.3, label = percent(pcent/100)), position = position_stack(vjust = 0.5), size = 4) +
-  scale_fill_discrete(name = "Play Type", labels = t$Var1) +
+  #scale_fill_discrete(name = "Play Type", labels = t$Var1) +
   labs(title = paste0("Play Type Percentages for ", na.omit(unique(dat$posteam))))
