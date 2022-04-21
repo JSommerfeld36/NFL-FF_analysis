@@ -110,10 +110,24 @@ plot_dat %>%
 library(scales)
 library(ggrepel)
 library(ggplot2)
+library(nflreadr)
+library(data.table)
 
+dat = data.table(load_player_stats(2021)) # Load all the player stats for the season so far
+colnames(dat)[1] = "gsis_id" # change the name of the column to make merging later easy
+week = dat[player_name != "H.Ruggs"]
+weekly_players = unique(week$gsis_id) # Get the unique IDs of the players for the week
+names = data.table(load_rosters(2021)) # Load in the complete roster
+
+players = names[names$gsis_id %in% weekly_players, ] # Filter players so only the ones who played count
+all_dat = merge(week, players) # Merge player stats with roster data so we have player positions
+all_dat = all_dat[position %in% c("QB", "WR", "TE", "RB"),]
+
+# Make A.Rodgers the Aa.Rodgers
+all_dat$player_name = gsub("A.Rodgers", "Aa.Rodgers", all_dat$player_name)
 
 # make pie chart for visualising target share
-team = plot_dat[recent_team == "KC" & week == "5" & position != "QB",]
+team = all_dat[recent_team == "KC" & week == "5" & position != "QB",]
 team = drop_na(team,target_share)
 
 team$concat = paste0(team$player_name, " - ", team$position)
@@ -123,7 +137,6 @@ n = nrow(team)
 ggplot(team, aes(x = "", y = target_share, fill = player_name)) +
   geom_bar(stat = "identity", width = 1, color = "white") +
   coord_polar("y", start = 0) +
-  scale_fill_manual(hcl.colors(n, palette = "viridis")) +
   theme_void() + 
   geom_text(aes(x = 1.3, label = percent(target_share)), position = position_stack(vjust = 0.5), size = 4) +
   scale_fill_discrete(name = "Player Name", labels = team$concat) +
@@ -131,12 +144,12 @@ ggplot(team, aes(x = "", y = target_share, fill = player_name)) +
 
 # pie chart of the play type tendencies
 x = load_pbp()
-dat = x[x$posteam == "CLE",]
+dat = x[x$posteam == "KC",]
 #colnames(dat)
 t = data.frame(table(dat$play_type)) 
 t$pcent = t$Freq/sum(t$Freq)*100
 
-
+# Why is it not scaling the slices according to the values??
 ggplot(t, aes(x = "", y = reorder(Freq, pcent), fill = Var1)) +
   geom_bar(stat = "identity", width = 1, color = "white") +
   coord_polar("y", start = 0) +
