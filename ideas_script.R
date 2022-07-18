@@ -112,6 +112,7 @@ library(ggrepel)
 library(ggplot2)
 library(nflreadr)
 library(data.table)
+library(tidyr)
 
 dat = data.table(load_player_stats(2021)) # Load all the player stats for the season so far
 colnames(dat)[1] = "gsis_id" # change the name of the column to make merging later easy
@@ -130,19 +131,24 @@ all_dat$player_name = gsub("A.Rodgers", "Aa.Rodgers", all_dat$player_name)
 team = all_dat[recent_team == "KC" & week == "5" & position != "QB",]
 team = drop_na(team,target_share)
 
-team$concat = paste0(team$player_name, " - ", team$position)
 
 # A nice color palette
 nice = colorspace::diverge_hcl(n = nrow(team))
+
+# Can I add catch percentage on the graph too???
+catch_rate = round(team$receptions/team$targets*100, 2)
+concat = paste0(team$player_name, " - ", team$position)
 
 # Basic piechart
 ggplot(team, aes(x = "", y = target_share, fill = player_name)) +
   geom_bar(stat = "identity", width = 1, color = "white") +
   coord_polar("y", start = 0) +
   theme_void() + 
-  scale_fill_manual(values = nice, name = "Player Name", guide = guide_legend(reverse = TRUE)) +
+  scale_fill_manual(values = nice, name = "Player Name", labels = concat, 
+                    guide = guide_legend(reverse = TRUE)) +
   geom_text(aes(x = 1.3, label = percent(target_share)), position = position_stack(vjust = 0.5), size = 4) +
-  #scale_fill_discrete(name = "Player Name", labels = team$concat) +
+  geom_text(aes(x = 1.6, label = paste0(catch_rate, "%")), position = position_stack(vjust = 0.5), size = 4) +
+  #scale_color_discrete(name = "Player Name", labels = c(team$concat)) +
   labs(title = "Target Share for Kansas City Chiefs, Week 4")
 
 # pie chart of the play type tendencies
@@ -151,6 +157,7 @@ dat = x[x$posteam == "CLE",]
 #colnames(dat)
 t = data.frame(table(dat$play_type)) 
 t$pcent = t$Freq/sum(t$Freq)*100
+nice = colorspace::diverge_hcl(n = nrow(t))
 
 # Why is it not scaling the slices according to the values??
 ggplot(t, aes(x = "", y = pcent, fill = Var1)) +
