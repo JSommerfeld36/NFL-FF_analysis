@@ -15,20 +15,20 @@ library(scales)
 library(ggrepel)
 
 
-dat = data.table(load_player_stats(2021)) # Load all the player stats for the season so far
+dat = data.table(load_player_stats(2022)) # Load all the player stats for the season so far
 colnames(dat)[1] = "gsis_id" # change the name of the column to make merging later easy
 week = dat[player_name != "H.Ruggs"]
 weekly_players = unique(week$gsis_id) # Get the unique IDs of the players for the week
-names = data.table(load_rosters(2021)) # Load in the complete roster
+names = data.table(load_rosters(2022)) # Load in the complete roster
 
 players = names[names$gsis_id %in% weekly_players, ] # Filter players so only the ones who played count
 all_dat = merge(week, players, by = "gsis_id") # Merge player stats with roster data so we have player positions
-all_dat = all_dat[position %in% c("QB", "WR", "TE", "RB"),]
+all_dat = all_dat[position.x %in% c("QB", "WR", "TE", "RB"),]
 colnames(all_dat)[5] = "week"
 
 # Get list of row names for regressions
 v.names = colnames(all_dat)
-v.names = v.names[c(7:47)]
+v.names = v.names[c(11:45)]
 
 # Make A.Rodgers the Aa.Rodgers
 all_dat$player_name = gsub("A.Rodgers", "Aa.Rodgers", all_dat$player_name)
@@ -50,14 +50,14 @@ pbp = load_pbp()
 
 # Define UI 
 ui = fluidPage(theme = shinytheme("yeti"),
-               titlePanel(paste0("NFL Stats Analysis -- Version 3.2.2: ", Sys.Date())), 
+               titlePanel(paste0("NFL Stats Analysis -- Version 3.3.0: ", Sys.Date())), 
                navbarPage("JSommerfeld36",
                           tabPanel("Player Stats",
                                    sidebarLayout(
                                      
                                      sidebarPanel(
-                                       selectInput('group1', 'pick a position', unique(table_dat$position)),
-                                       selectInput('gameWeek1', 'Game Week', sort(unique(table_dat$week)), selected = "1"),
+                                       selectInput('group1', 'pick a position', unique(table_dat$position.x)),
+                                       selectInput('gameWeek1', 'Game Week', sort(unique(table_dat$week.x)), selected = "1"),
                                        selectInput('player1', 'Player Name', choices = NULL),
                                        selectInput('player2', 'Player Name', choices = NULL),
                                        selectInput('player3', 'Player Name', choices = NULL)
@@ -78,8 +78,8 @@ ui = fluidPage(theme = shinytheme("yeti"),
                                    sidebarLayout(
                                      
                                      sidebarPanel(
-                                       selectInput('group2', 'pick a position', unique(table_dat$position)),
-                                       selectInput('gameWeek2', 'Game Week', choices = sort(unique(table_dat$week)), 
+                                       selectInput('group2', 'pick a position', unique(table_dat$position.x)),
+                                       selectInput('gameWeek2', 'Game Week', choices = sort(unique(table_dat$week.x)), 
                                                    selected = 1),
                                        selectInput('x2', 'Predicted Variable', choices = v.names, 
                                                    selected = "fantasy_points"),
@@ -105,7 +105,7 @@ ui = fluidPage(theme = shinytheme("yeti"),
                                    sidebarLayout(
                                      sidebarPanel(
                                        selectInput('footballTeam', 'Pick a Team', unique(plot_dat$recent_team)),
-                                       selectInput('gameWeek3', 'Pick a Game Week', choices = sort(unique(plot_dat$week)), 
+                                       selectInput('gameWeek3', 'Pick a Game Week', choices = sort(unique(plot_dat$week.x)), 
                                                    selected = 1)
                                      ),
                                      mainPanel(
@@ -122,9 +122,9 @@ ui = fluidPage(theme = shinytheme("yeti"),
                                    ), 
                                    tabPanel("Instructions")
                           )
-
+                          
                ) # navbarPage
-
+               
 )
 
 
@@ -135,7 +135,7 @@ server <- function(input, output) {
   
   # Filter the player drop down list based on the position group selected
   this <- reactive({
-    filter(table_dat, position == input$group1 & week == input$gameWeek1)
+    filter(table_dat, position.x == input$group1 & week.x == input$gameWeek1)
   })
   
   # Player 1
@@ -161,22 +161,22 @@ server <- function(input, output) {
       
       week_max = reactive({
         plot_dat %>% 
-          filter(plot_dat$position %in% input$group1 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(7:14)) %>%
+          filter(plot_dat$position.x %in% input$group1 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(11:16, 20,22)) %>%
           summarise_if(is.numeric, max)
       })
       
       week_min = reactive({
         plot_dat %>% 
-          filter(plot_dat$position %in% input$group1 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(7:14)) %>%
+          filter(plot_dat$position.x %in% input$group1 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(11:16, 20,22)) %>%
           summarise_if(is.numeric, min)
       })
       
       p1 = reactive({
         plot_dat %>%
-          filter(plot_dat$player_name %in% c(input$player1, input$player2, input$player3)  & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(7:14))
+          filter(plot_dat$player_name %in% c(input$player1, input$player2, input$player3)  & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(11:16, 20,22))
       })
       
       all = reactive({
@@ -196,33 +196,33 @@ server <- function(input, output) {
       
       week_max = reactive({
         plot_dat %>% 
-          filter(plot_dat$position %in% input$group1 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(31:39)) %>%
+          filter(plot_dat$position.x %in% input$group1 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(35:38,41:42)) %>%
           summarise_if(is.numeric, max)
       })
       
       week_min = reactive({
         plot_dat %>% 
-          filter(plot_dat$position %in% input$group1 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(31:39)) %>%
+          filter(plot_dat$position.x %in% input$group1 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(35:38,41:42)) %>%
           summarise_if(is.numeric, min)
       })
       
       p1 = reactive({
         plot_dat %>%
-          filter(plot_dat$player_name %in% input$player1 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(31:39))
+          filter(plot_dat$player_name %in% input$player1 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(35:38,41:42))
       })
       
       p2 = reactive({
         plot_dat %>%
-          filter(plot_dat$player_name %in% input$player2 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(31:39))
+          filter(plot_dat$player_name %in% input$player2 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(35:38,41:42))
       })
       p3 = reactive({
         plot_dat %>%
-          filter(plot_dat$player_name %in% input$player3 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(31:39))
+          filter(plot_dat$player_name %in% input$player3 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(35:38,41:42))
       })
       
       all = reactive({
@@ -242,22 +242,22 @@ server <- function(input, output) {
       
       week_max = reactive({
         plot_dat %>% 
-          filter(plot_dat$position %in% input$group1 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(23:26,28,30)) %>%
+          filter(plot_dat$position.x %in% input$group1 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(27:32)) %>%
           summarise_if(is.numeric, max)
       })
       
       week_min = reactive({
         plot_dat %>% 
-          filter(plot_dat$position %in% input$group1 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(23:26,28,30)) %>%
+          filter(plot_dat$position.x %in% input$group1 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(27:32)) %>%
           summarise_if(is.numeric, min)
       })
       
       p1 = reactive({
         plot_dat %>%
-          filter(plot_dat$player_name %in% c(input$player1, input$player2, input$player3)  & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(23:26,28,30))
+          filter(plot_dat$player_name %in% c(input$player1, input$player2, input$player3)  & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(27:32))
       })
       
       
@@ -278,22 +278,22 @@ server <- function(input, output) {
       
       week_max = reactive({
         plot_dat %>% 
-          filter(plot_dat$position %in% input$group1 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(31:39)) %>%
+          filter(plot_dat$position.x %in% input$group1 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(35:38,41:42)) %>%
           summarise_if(is.numeric, max)
       })
       
       week_min = reactive({
         plot_dat %>% 
-          filter(plot_dat$position %in% input$group1 & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(31:39)) %>%
+          filter(plot_dat$position.x %in% input$group1 & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(35:38,41:42)) %>%
           summarise_if(is.numeric, min)
       })
       
       p1 = reactive({
         plot_dat %>%
-          filter(plot_dat$player_name %in% c(input$player1, input$player2, input$player3)  & plot_dat$week %in% input$gameWeek1) %>%
-          select(c(31:39))
+          filter(plot_dat$player_name %in% c(input$player1, input$player2, input$player3)  & plot_dat$week.x %in% input$gameWeek1) %>%
+          select(c(35:38,41:42))
       })
       
       all = reactive({
@@ -320,33 +320,33 @@ server <- function(input, output) {
     if (input$group1 == "QB") {
       
       table_dat %>%
-        filter(table_dat$position %in% input$group1 & table_dat$week %in% input$gameWeek1) %>%
-        arrange(desc(fantasy_points)) %>%
-        select(c(3,7:14,47)) %>%
+        filter(table_dat$position.x %in% input$group1 & table_dat$week.x %in% input$gameWeek1) %>%
+        arrange(desc(completions)) %>%
+        select(c(2,11:16,20,22)) %>%
         head(10)
       
     } else if (input$group1 == "WR"){
       
       table_dat %>%
-        filter(table_dat$position %in% input$group1 & table_dat$week %in% input$gameWeek1) %>%
-        arrange(desc(fantasy_points)) %>%
-        select(c(3,31:39,47)) %>%
+        filter(table_dat$position.x %in% input$group1 & table_dat$week.x %in% input$gameWeek1) %>%
+        arrange(desc(receptions)) %>%
+        select(c(2,35:38,41:42)) %>%
         head(10)
       
     } else if (input$group1 == "RB"){
       
       table_dat %>%
-        filter(table_dat$position %in% input$group1 & table_dat$week %in% input$gameWeek1) %>%
-        arrange(desc(fantasy_points)) %>%
-        select(c(3,23:26,28,30,47)) %>%
+        filter(table_dat$position.x %in% input$group1 & table_dat$week.x %in% input$gameWeek1) %>%
+        arrange(desc(carries)) %>%
+        select(c(2,27:32)) %>%
         head(10)
       
     } else if (input$group1 == "TE"){
       
       table_dat %>%
-        filter(table_dat$position %in% input$group1 & table_dat$week %in% input$gameWeek1) %>%
-        arrange(desc(fantasy_points)) %>%
-        select(c(3,31:39,47)) %>%
+        filter(table_dat$position.x %in% input$group1 & table_dat$week.x %in% input$gameWeek1) %>%
+        arrange(desc(receptions)) %>%
+        select(c(2,35:38,41:42)) %>%
         head(10)
       
     } else {}
@@ -387,18 +387,18 @@ server <- function(input, output) {
   x = reactive({
     if (input$group2 == "QB") {
       
-      filter(table_dat, position %in% input$group2 & week %in% input$gameWeek2)
+      filter(table_dat, position.x %in% input$group2 & week.x %in% input$gameWeek2)
     } else if (input$group2 == "WR") {
       
-      filter(table_dat, position %in% input$group2 & week %in% input$gameWeek2)
+      filter(table_dat, position.x %in% input$group2 & week.x %in% input$gameWeek2)
       
     } else if (input$group2 == "RB"){
       
-      filter(table_dat, position %in% input$group2 & week %in% input$gameWeek2)
+      filter(table_dat, position.x %in% input$group2 & week.x %in% input$gameWeek2)
       
     } else if (input$group2 == "TE"){
       
-      filter(table_dat, position %in% input$group2 & week %in% input$gameWeek2)
+      filter(table_dat, position.x %in% input$group2 & week.x %in% input$gameWeek2)
     } else {}
   })
   
@@ -431,7 +431,7 @@ server <- function(input, output) {
   # Tab 3 -------------------------------------------------------------------
   
   team = reactive({
-    filter(plot_dat, recent_team %in% input$footballTeam & week %in% input$gameWeek3 & position != "QB") %>%
+    filter(plot_dat, recent_team %in% input$footballTeam & week.x %in% input$gameWeek3 & position.x != "QB") %>%
       drop_na(target_share)
   })
   
@@ -443,7 +443,7 @@ server <- function(input, output) {
   # Calculate catch percentage
   catch_rate = reactive({ round(team()$receptions/team()$targets*100, 2)  })
   # Add player positions to the legend
-  concat = reactive({ paste0(team()$player_name, " - ", team()$position)  })
+  concat = reactive({ paste0(team()$player_name, " - ", team()$position.x)  })
   
   output$receivers = renderPlot({
     
